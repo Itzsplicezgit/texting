@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat+</title>
+<style>
+  body { background-color:#121212; color:#e0e0e0; font-family:Arial,sans-serif; display:flex; flex-direction:column; align-items:center; margin:0; height:100vh; }
+  #login,#chatPage { width:90%; max-width:600px; margin-top:50px; display:none; }
+  #chatBox { border:1px solid #333; padding:10px; height:400px; overflow-y:scroll; background-color:#1e1e1e; }
+  #chatBox div{ margin-bottom:5px; }
+  input, button{ padding:8px; margin:5px 0; border:none; border-radius:4px; }
+  input{ width:calc(100% - 16px); }
+  button{ background-color:#6200ea; color:white; cursor:pointer; }
+  button:hover{ background-color:#3700b3; }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h2>Welcome to Chat+</h2>
+  <input type="password" id="passwordInput" placeholder="Enter password">
+  <button onclick="login()">Enter Chat+</button>
+</div>
+
+<div id="chatPage">
+  <h2>Chat+</h2>
+  <label>Username: <input type="text" id="username" value="Guest"></label>
+  <div id="chatBox"></div>
+  <input type="text" id="messageInput" placeholder="Type a message...">
+  <button onclick="sendMessage()">Send</button>
+</div>
+
+<script>
+const loginDiv = document.getElementById('login');
+const chatDiv = document.getElementById('chatPage');
+const chatBox = document.getElementById('chatBox');
+
+loginDiv.style.display = "block";
+
+async function login() {
+  const password = document.getElementById('passwordInput').value;
+  const res = await fetch('/login', {
+    method: 'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ password })
+  });
+  const data = await res.json();
+  if(data.success) {
+    loginDiv.style.display = "none";
+    chatDiv.style.display = "block";
+    fetchMessages();
+    setInterval(fetchMessages, 2000); // refresh chat every 2s
+  } else {
+    alert("Incorrect password!");
+  }
+}
+
+async function sendMessage() {
+  const user = document.getElementById('username').value || "Guest";
+  const text = document.getElementById('messageInput').value.trim();
+  if(!text) return;
+  await fetch('/message', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ user, text })
+  });
+  document.getElementById('messageInput').value = '';
+  fetchMessages();
+}
+
+async function fetchMessages() {
+  const res = await fetch('/messages');
+  const msgs = await res.json();
+  chatBox.innerHTML = "";
+  msgs.forEach(msg => {
+    const div = document.createElement('div');
+    div.textContent = `${msg.user}: ${msg.text}`;
+    chatBox.appendChild(div);
+  });
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+</script>
+
+</body>
+</html>
