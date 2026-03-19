@@ -1,136 +1,159 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chat+</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chat+ Minimal B&W</title>
 <style>
-body, html { margin:0; padding:0; height:100%; width:100%; font-family:Arial,sans-serif; background:#121212; color:#e0e0e0; }
-#login, #chatPage { display:none; height:100%; width:100%; justify-content:center; align-items:center; flex-direction:column; }
-#chatPage { display:flex; flex-direction:column; }
-#chatBox { flex:1; overflow-y:auto; padding:10px; border-bottom:1px solid #333; background:#1e1e1e; }
-.message { display:flex; align-items:flex-start; margin-bottom:10px; }
-.message img { width:40px; height:40px; border-radius:50%; margin-right:10px; object-fit:cover; }
-.message-content { max-width:80%; word-wrap:break-word; }
-.message-content img { max-width:100%; border-radius:8px; margin-top:5px; }
-.timestamp { font-size:10px; color:#888; margin-top:2px; }
-#inputArea { display:flex; padding:10px; background:#121212; }
-#inputArea input[type=text] { flex:1; padding:10px; border-radius:5px; border:none; margin-right:5px; }
-#inputArea button { padding:10px 15px; border:none; border-radius:5px; background:#6200ea; color:white; cursor:pointer; }
-#inputArea button:hover{ background:#3700b3; }
-#usernamePfp { display:flex; align-items:center; margin-bottom:10px; }
-#usernamePfp img { width:50px; height:50px; border-radius:50%; margin-left:10px; object-fit:cover; cursor:pointer; }
+  * { box-sizing:border-box; }
+  body, html { margin:0; padding:0; height:100%; width:100%; background:#000; color:#fff; font-family:'Segoe UI',sans-serif; display:flex; flex-direction:column; }
+  #chatPage { display:flex; flex-direction:column; height:100%; width:100%; }
+
+  /* Header */
+  #header { display:flex; align-items:center; padding:10px 20px; border-bottom:1px solid #333; gap:15px; }
+  #username { background:transparent; border:none; color:#fff; font-size:18px; padding:5px 8px; width:200px; outline:none; }
+  #pfpPreview { width:40px; height:40px; border-radius:50%; object-fit:cover; cursor:pointer; border:1px solid #555; }
+  #pfpInput { display:none; }
+
+  /* Chat container */
+  #chatBox { flex-grow:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:15px; background:#000; scroll-behavior:smooth; }
+
+  .message { display:flex; gap:10px; align-items:flex-start; max-width:800px; word-break:break-word; }
+  .message img.avatar { width:40px; height:40px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+  .message-content { background:#111; border-radius:12px; padding:12px 16px; color:#ddd; font-size:16px; position:relative; }
+  .message-content img.chat-image { margin-top:8px; max-width:320px; border-radius:10px; display:block; }
+  .timestamp { font-size:11px; color:#555; margin-top:6px; text-align:right; font-family:monospace; }
+  .deleteBtn { position:absolute; top:4px; right:4px; cursor:pointer; width:18px; height:18px; }
+
+  /* Input */
+  #inputArea { display:flex; padding:15px 20px; border-top:1px solid #222; background:#111; gap:10px; align-items:center; }
+  #messageInput { flex-grow:1; background:#000; border:none; border-radius:0; padding:14px 16px; color:#eee; font-size:16px; outline:none; }
+  #sendBtn, #imageBtn { background:transparent; border:none; color:#fff; font-size:22px; cursor:pointer; padding:8px 10px; }
+  #sendBtn:hover, #imageBtn:hover { background-color: rgba(255,255,255,0.1); }
+  #imageInput { display:none; }
 </style>
 </head>
 <body>
 
-<div id="login">
-  <h2>Welcome to Chat+</h2>
-  <input type="password" id="passwordInput" placeholder="Enter password">
-  <button onclick="login()">Enter Chat+</button>
-</div>
-
 <div id="chatPage">
-  <div id="usernamePfp">
-    <input type="text" id="username" placeholder="Username">
-    <img id="pfpPreview" src="" alt="PFP" title="Click to change">
-    <input type="file" id="pfpInput" style="display:none">
+  <div id="header">
+    <input id="username" type="text" placeholder="Your name..." autocomplete="off" spellcheck="false" />
+    <img id="pfpPreview" src="pfp.png" alt="Profile Picture" title="Click to change profile picture" />
+    <input type="file" id="pfpInput" accept="image/*" />
   </div>
+
   <div id="chatBox"></div>
+
   <div id="inputArea">
-    <input type="text" id="messageInput" placeholder="Type a message...">
-    <button onclick="sendMessage()">Send</button>
+    <input id="messageInput" type="text" placeholder="Type a message..." autocomplete="off" spellcheck="false" />
+    <input type="file" id="imageInput" accept="image/*" />
+    <button id="imageBtn" title="Attach image">📎</button>
+    <button id="sendBtn" title="Send message">➤</button>
   </div>
 </div>
 
 <script>
-const loginDiv = document.getElementById('login');
-const chatDiv = document.getElementById('chatPage');
 const chatBox = document.getElementById('chatBox');
 const usernameInput = document.getElementById('username');
 const pfpPreview = document.getElementById('pfpPreview');
 const pfpInput = document.getElementById('pfpInput');
+const messageInput = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
+const imageBtn = document.getElementById('imageBtn');
+const imageInput = document.getElementById('imageInput');
 
-loginDiv.style.display="flex";
+const defaultPfp = 'pfp.png';
+let selectedImageFile = null;
+let messages = []; // In-memory messages (you can move to DB later)
 
-// Load pfp and username from localStorage
-if(localStorage.getItem('chatplusUsername')) usernameInput.value = localStorage.getItem('chatplusUsername');
-if(localStorage.getItem('chatplusPfp')) pfpPreview.src = localStorage.getItem('chatplusPfp');
+// Load PFP from localStorage
+pfpPreview.src = localStorage.getItem('chatplusPfp') || defaultPfp;
 
-// PFP change
+// PFP upload
 pfpPreview.onclick = ()=> pfpInput.click();
-pfpInput.onchange = async (e)=>{
-  const file = e.target.files[0];
+pfpInput.onchange = async ()=>{
+  const file = pfpInput.files[0];
   if(!file) return;
   const form = new FormData();
-  form.append('pfp', file);
-  const res = await fetch('/upload-pfp', { method:'POST', body:form });
+  form.append('image', file);
+  const res = await fetch('/upload', { method:'POST', body: form });
   const data = await res.json();
-  if(data.url){
-    pfpPreview.src = data.url;
-    localStorage.setItem('chatplusPfp', data.url);
-  }
+  if(data.url){ pfpPreview.src = data.url; localStorage.setItem('chatplusPfp', data.url); }
+};
+
+// Chat image attach
+imageBtn.onclick = ()=> imageInput.click();
+imageInput.onchange = ()=> selectedImageFile = imageInput.files[0];
+
+// Replace emoji codes with PNGs
+function replaceEmojis(text){
+  return text.replace(/:([a-z0-9_]+):/gi,(m,name)=>`<img src="${name}.png" alt="${name}" style="width:20px;vertical-align:middle;">`);
 }
 
-// Login
-async function login(){
-  const password = document.getElementById('passwordInput').value;
-  const res = await fetch('/login',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password}) });
-  const data = await res.json();
-  if(data.success){
-    loginDiv.style.display="none";
-    chatDiv.style.display="flex";
-    fetchMessages();
-    setInterval(fetchMessages,2000);
-  } else { alert("Incorrect password!"); }
-}
-
-// Send message
-async function sendMessage(){
-  const text = document.getElementById('messageInput').value.trim();
-  if(!text) return;
-  const user = usernameInput.value || "Guest";
-  const pfp = pfpPreview.src || null;
-  await fetch('/message', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user,text,pfp}) });
-  localStorage.setItem('chatplusUsername', user);
-  document.getElementById('messageInput').value='';
-  fetchMessages();
-}
-
-// Enter key to send
-document.getElementById('messageInput').addEventListener('keypress', e=>{
-  if(e.key==='Enter') sendMessage();
-});
-
-// Fetch messages
-async function fetchMessages(){
-  const res = await fetch('/messages');
-  const messages = await res.json();
-  chatBox.innerHTML="";
-  messages.forEach(msg=>{
+// Render messages
+function renderMessages(){
+  chatBox.innerHTML = '';
+  messages.forEach((msg,index)=>{
     const div = document.createElement('div');
     div.className='message';
-    const img = document.createElement('img');
-    img.src = msg.pfp || 'https://via.placeholder.com/40';
+
+    const avatar = document.createElement('img');
+    avatar.className='avatar';
+    avatar.src = msg.pfp || defaultPfp;
+    div.appendChild(avatar);
+
     const content = document.createElement('div');
     content.className='message-content';
-    if(msg.text) content.textContent=msg.text;
-    if(msg.image){
-      const imgel = document.createElement('img');
-      imgel.src=msg.image;
-      content.appendChild(imgel);
+
+    if(msg.text) content.innerHTML = replaceEmojis(msg.text);
+    if(msg.image){ const img = document.createElement('img'); img.src=msg.image; img.className='chat-image'; content.appendChild(img); }
+
+    const timestamp = document.createElement('div');
+    timestamp.className='timestamp';
+    timestamp.textContent = new Date(msg.timestamp).toLocaleString();
+    content.appendChild(timestamp);
+
+    if(msg.user === usernameInput.value){
+      const del = document.createElement('img');
+      del.src='trash.png';
+      del.className='deleteBtn';
+      del.title='Delete message';
+      del.onclick = ()=> { messages.splice(index,1); renderMessages(); };
+      content.appendChild(del);
     }
-    const ts = document.createElement('div');
-    ts.className='timestamp';
-    ts.textContent = new Date(msg.timestamp).toLocaleString();
-    content.appendChild(ts);
-    div.appendChild(img);
+
     div.appendChild(content);
     chatBox.appendChild(div);
   });
   chatBox.scrollTop = chatBox.scrollHeight;
 }
-</script>
 
+// Send message
+async function sendMessage(){
+  const text = messageInput.value.trim();
+  const user = usernameInput.value || 'Guest';
+  const pfp = pfpPreview.src || defaultPfp;
+  if(!text && !selectedImageFile) return;
+
+  if(selectedImageFile){
+    const form = new FormData();
+    form.append('image', selectedImageFile);
+    const res = await fetch('/upload', { method:'POST', body: form });
+    const data = await res.json();
+    addMessage(text,user,pfp,data.url);
+  } else addMessage(text,user,pfp,null);
+}
+
+function addMessage(text,user,pfp,image){
+  messages.push({text,user,pfp,image,timestamp:Date.now()});
+  messageInput.value=''; selectedImageFile=null; imageInput.value=null;
+  renderMessages();
+}
+
+sendBtn.onclick = sendMessage;
+messageInput.addEventListener('keypress', e=>{ if(e.key==='Enter') sendMessage(); });
+
+renderMessages();
+</script>
 </body>
 </html>
