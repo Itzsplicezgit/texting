@@ -1,75 +1,58 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const fs = require('fs');
-const path = require('path');
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+// Middleware
+app.use(bodyParser.json());
 app.use(express.static(__dirname));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-const PASSWORD = "secret123";
-const MESSAGE_FILE = path.join(__dirname, "messages.json");
-const UPLOAD_DIR = path.join(__dirname, "uploads");
-
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
-
-// Multer setup for image uploads
+// Multer setup
 const storage = multer.diskStorage({
-  destination: UPLOAD_DIR,
-  filename: (req, file, cb) => {
-    const unique = Date.now() + '-' + Math.round(Math.random()*1E9);
-    cb(null, unique + path.extname(file.originalname));
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/');
+  },
+  filename: function (req, file, cb) {
+    const unique = Date.now() + '-' + file.originalname;
+    cb(null, unique);
   }
 });
 const upload = multer({ storage });
 
-// Load messages from JSON
+// Simple in-memory storage
 let messages = [];
-if (fs.existsSync(MESSAGE_FILE)) {
-  try { messages = JSON.parse(fs.readFileSync(MESSAGE_FILE)); }
-  catch(err){ messages = []; }
-}
+const PASSWORD = "1234"; // Change your chat password
 
-// Save messages
-function saveMessages() {
-  fs.writeFileSync(MESSAGE_FILE, JSON.stringify(messages.slice(-500))); // keep last 500
-}
-
-// Login
-app.post('/login', (req,res)=>{
+// Routes
+app.post('/login', (req, res) => {
   const { password } = req.body;
-  res.json({ success: password === PASSWORD });
+  if (password === PASSWORD) res.json({ success: true });
+  else res.json({ success: false });
 });
 
-// Send text message
-app.post('/message', (req,res)=>{
+app.post('/upload-pfp', upload.single('pfp'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  const url = `/uploads/${req.file.filename}`;
+  res.json({ url });
+});
+
+app.post('/message', (req, res) => {
   const { user, text, pfp } = req.body;
-  if(!user || (!text && !req.body.image)) return res.status(400).json({error:'Invalid'});
-  const message = {
-    user,
-    text: text || null,
-    image: req.body.image || null, // optional base64 image
-    timestamp: new Date().toISOString(),
-    pfp: pfp || null
-  };
-  messages.push(message);
-  saveMessages();
-  res.json({ success:true });
+  const msg = { user, text, pfp, timestamp: Date.now() };
+  messages.push(msg);
+  res.json({ success: true });
 });
 
-// Upload profile pic
-app.post('/upload-pfp', upload.single('pfp'), (req,res)=>{
-  if(!req.file) return res.status(400).json({error:'No file'});
-  res.json({ url: '/uploads/' + req.file.filename });
-});
-
-// Get all messages
-app.get('/messages', (req,res)=>{
+app.get('/messages', (req, res) => {
   res.json(messages);
 });
 
-app.listen(PORT, ()=>console.log(`Chat+ running on port ${PORT}`));
+// Start server
+app.listen(PORT, () => {
+  console.log(`Chat+ running at http://localhost:${PORT}`);
+});
