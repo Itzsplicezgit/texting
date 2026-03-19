@@ -1,8 +1,11 @@
 FROM node:20-alpine
 WORKDIR /usr/src/app
 
-# Copy package.json and package-lock.json if available
+# Copy package.json
 COPY package.json ./
+
+# Upgrade npm to latest stable
+RUN npm install -g npm@11.12.0
 
 # Install dependencies
 RUN npm install
