@@ -23,7 +23,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Site password middleware
-const SITE_PASSWORD = process.env.SITE_PASSWORD || 'chatplus123';
+const SITE_PASSWORD = process.env.SITE_PASSWORD || 'onlyfans';
 app.post('/login', (req, res) => {
   const { password } = req.body;
   if (password === SITE_PASSWORD) res.json({ success: true });
