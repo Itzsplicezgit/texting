@@ -1,39 +1,90 @@
 const express = require('express');
-const bodyParser = require('body-parser');
+const fs = require('fs');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
-// Middleware
-app.use(bodyParser.json());
-app.use(express.static('public'));
-app.use('/uploads', express.static('uploads'));
+app.use(express.json());
+app.use(express.static(__dirname));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Ensure uploads folder exists
-if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
+if (!fs.existsSync('./uploads')) fs.mkdirSync('./uploads');
 
-// Multer setup
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
+  destination: './uploads/',
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
 });
+
 const upload = multer({ storage });
 
-// Site password middleware
-const SITE_PASSWORD = process.env.SITE_PASSWORD || 'onlyfans';
+function read(file) {
+  if (!fs.existsSync(file)) return [];
+  return JSON.parse(fs.readFileSync(file));
+}
+
+function write(file, data) {
+  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
+
+/* REGISTER */
+app.post('/register', upload.single('pfp'), (req, res) => {
+  const { username, password } = req.body;
+  let users = read('users.json');
+
+  if (users.find(u => u.username === username)) {
+    return res.status(400).send('user exists');
+  }
+
+  const user = {
+    username,
+    password,
+    pfp: req.file ? '/uploads/' + req.file.filename : null
+  };
+
+  users.push(user);
+  write('users.json', users);
+
+  res.json(user);
+});
+
+/* LOGIN */
 app.post('/login', (req, res) => {
-  const { password } = req.body;
-  if (password === SITE_PASSWORD) res.json({ success: true });
-  else res.json({ success: false });
+  const { username, password } = req.body;
+  const users = read('users.json');
+
+  const user = users.find(u => u.username === username && u.password === password);
+  if (!user) return res.status(401).send('invalid');
+
+  res.json(user);
 });
 
-// Image upload endpoint (for PFP or chat images)
-app.post('/upload', upload.single('image'), (req, res) => {
-  res.json({ url: `/uploads/${req.file.filename}` });
+/* SEND MESSAGE */
+app.post('/message', upload.array('files'), (req, res) => {
+  const { username, text } = req.body;
+  let messages = read('messages.json');
+
+  const files = (req.files || []).map(f => '/uploads/' + f.filename);
+
+  const msg = {
+    username,
+    text,
+    files,
+    time: Date.now()
+  };
+
+  messages.push(msg);
+  write('messages.json', messages);
+
+  res.json(msg);
 });
 
-// Start server
-app.listen(PORT, () => console.log(`Chat+ running on port ${PORT}`));
+/* GET MESSAGES */
+app.get('/messages', (req, res) => {
+  res.json(read('messages.json'));
+});
+
+app.listen(PORT, () => console.log('running on ' + PORT));
